@@ -1,0 +1,280 @@
+\documentclass[a4paper, 12pt]{report}
+\pdfpagewidth\paperwidth
+\pdfpageheight\paperheight
+\usepackage[italian]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Vhdl,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+\begin{document}
+	\title{Progetto finale di Reti Logiche - Equalizzatore dell'istogramma di una immagine}\author{Jasco Chen(10662235) Simone Coluccio(10633129)}\date{Anno 2020/2021}
+	\maketitle
+
+	\tableofcontents
+	\chapter{Introduzione}
+		\section{Descrizione generale}
+			Il progetto si basa sull'implementazione, in VHDL con FPGA target :\\xc7a200tfbg484-1 e clock impostato a 100ns,
+			di un metodo di equalizzazione dell'istogramma di una immagine.
+			il metodo consiste nel ricalibrare il contrasto di una data immagine quando l'intervallo dei valori di intensità
+			sono molto vicini effettuandone una distribuzione su tutto
+			l'intervallo di intensità, al fine di incrementare il contrasto.
+		\section{Algoritmo}
+			l'algoritmo utilizzato è una versione semplificata della versione standard,\\
+			è applicato su una scala di grigi a 256 livelli con intervallo tra [0 255],\\
+		 	la trasformazione dei pixel avviene nel modo seguente:\\\\\\\par
+					 DELTA VALUE = MAX PIXEL VALUE - MIN PIXEL VALUE\par
+					 SHIFT LEVEL = (8 – FLOOR(LOG2(DELTA VALUE +1)))\par 
+					 TEMP PIXEL = (CURRENT - MIN PIXEL VALUE) << SHIFT LEVEL\par
+					 NEW PIXEL VALUE = MIN( 255 , TEMP PIXEL) \\\par
+			Dove \textbf{MAX PIXEL VALUE} e \textbf{MIN PIXEL VALUE}, sono il massimo\par 
+			e minimo valore dei pixel dell’immagine,\par
+			\textbf{CURRENT PIXEL VALUE} è il valore del pixel da trasformare, e\par
+			\textbf{NEW PIXEL VALUE} è il valore del nuovo pixel.\\\\\\\\
+			%Esempio prima e dopo:\\\\
+			%\includegraphics[width=208px, height=117px]{before} \includegraphics[width=208px, height=117px]{after}
+		\section{Interfaccia del componente}
+			Il componente descritto ha la seguente interfaccia:\\\\
+				entity project\_reti\_logiche is\par
+				port (\par
+					i\_clk : in std\_logic;\par
+					i\_rst : in std\_logic;\par
+					i\_start : in std\_logic;\par
+					i\_data : in std\_logic\_vector(7 downto 0);\par
+					o\_address : out std\_logic\_vector(15 downto 0);\par
+					o\_done : out std\_logic;\par
+					o\_en : out std\_logic;\par
+					o\_we : out std\_logic;\par
+					o\_data : out std\_logic\_vector (7 downto 0)\\
+				);\\
+				end project\_reti\_logiche;\\\\
+			in particolare:\\\par
+				• i\_clk è il segnale di CLOCK in ingresso generato dal TestBench;\par
+				• i\_rst è il segnale di RESET che inizializza la macchina pronta\par\par per ricevere il primo segnale di START;\par
+				• i\_start è il segnale di START generato dal Test Bench;\par
+				• i\_data è il segnale (vettore) che arriva dalla memoria in seguito ad una\par\par richiesta di lettura;\par
+				• o\_address è il segnale (vettore) di uscita che manda l’indirizzo alla\par\par memoria;\par
+				• o\_done è il segnale di uscita che comunica la fine dell’elaborazione e il\par\par dato di uscita scritto in memoria;\par
+				• o\_en è il segnale di ENABLE da dover mandare alla memoria per poter\par\par comunicare (sia in lettura che in scrittura);\par
+				• o\_we è il segnale di WRITE ENABLE da dover mandare alla memoria\par\par (=1) per poter scriverci. Per leggere da memoria esso deve essere 0;\par
+				• o\_data è il segnale (vettore) di uscita dal componente verso la memoria.\\
+		\section{Dati e descrizione della Memoria}
+			Il modulo implementato legge l’immagine da una memoria in cui è memorizzata,
+			sequenzialmente e riga per riga, l’immagine da elaborare. Ogni byte corrisponde ad un pixel
+			dell’immagine.\\
+			La dimensione della immagine è definita da \textbf{2 byte}, memorizzati a partire dall’\textbf{indirizzo 0}.\\ Il
+			byte all’indirizzo 0 si riferisce alla dimensione di colonna; il byte nell’indirizzo 1 si riferisce
+			alla dimensione di riga.\\ La \textbf{dimensione massima} dell’immagine è \textbf{128x128 pixel}.\\
+			L’immagine è memorizzata a partire dall’indirizzo 2 e in byte contigui. Quindi il byte
+			all’indirizzo 2 è il primo pixel della prima riga dell’immagine.\\\\
+			I pixel dell'immagine, ciascuna di \textbf{8 bit}, sono memorizzari in unasono memorizzati in una
+			memoria con indirizzamento al Byte partendo dalla \textbf{posizione 0}: il byte in posizione 0 si
+			riferisce al numero di \textbf{colonne} (N-COL), il byte in posizione 1 si riferisce al numero di \textbf{righe}
+			(N-RIG).\\
+			I pixel del’immagine, ciascuno di un \textbf{8 bit}, sono memorizzati in memoria con indirizzamento
+			al Byte partendo dalla posizione \textbf{2}.\\
+			I pixel della immagine equalizzata, ciascuno di un \textbf{8 bit}, sono memorizzati in memoria con
+			indirizzamento al Byte partendo dalla \textbf{posizione}: 2+(N-COL*N-RIG)+1.\\\\\\
+			\textbf{ESEMPIO} di allocazione nella RAM di una immagine \textbf{2x2}:\\\par
+				\begin{center}
+				\begin{tabular}{|c | c|l}
+					 \hline Ind. Mem. & Valore \\ \hline 
+								0 & 2\\ \hline
+								1 & 2\\ \hline
+								2 & 46\\ \hline
+								3 & 131\\ \hline
+								4 &	62 \\ \hline
+								5 & 89\\ \hline
+								6 & 0\\ \hline
+								7 & 255\\ \hline
+								8 & 62 \\ \hline
+								9 & 172\\ \hline
+				\end{tabular}
+				\end{center}
+				dove le 
+				\textbf{dimensioni} della immagine è definita negli indirizzi \textbf{0} e \textbf{1}, i \textbf{pixel} dell'immagine arrivati tramite in input dall'indirizzo \textbf{[2 5]} 
+				e i pixel equalizzati dall'indirizzo \textbf{[6 9]} 
+	\chapter{Design}
+		\section{Segnali implementati}
+			Per il memorizzare i valori dei pixel abbiamo scelto di utilizzare registri \textbf{principali} e registri \textbf{ausiliari}, quest'ultimi forniscono una sorta di supporto per il corretto funzionamento della macchina a 					stati.\\
+			I \textbf{registri} utilizzati per il calcolo diretto dell'algoritmo hanno nomi analoghi alle variabili dell'algoritmo mentre quelle utilizzati in modo ausiliare hanno un indice numerico.\\
+			I segnali di \textbf{load} sono utilizzati per il caricamento di un valore nel registro con il nome simile a quello del segnale.\\
+			Segnali \textbf{max} e \textbf{min} sono segnali per notificare la macchina se il valore entrante è un massimo oppure un minimo assoluto.\\
+			Segnali \textbf{sel} insieme ai \textbf{mux} sono utilizzati per gestire gli input dei \textbf{multiplexer}.\\
+			Segnali \textbf{sum} e \textbf{sub} per gestire rispettivamente la somma e sottrazione.\\ 
+			\subsection{Scelte progettuali}
+				Per la moltiplicazione abbiamo scelto di procedere con un algoritmo, che dati due input \textbf{n} e \textbf{m} sommava \textbf{m}-volte \textbf{n} a se stesso.\\
+				I cicli li abbiamo gestiti tramite l'utilizzo di un \textbf{multiplexer} insieme ad un \textbf{sommatore} oppure \textbf{sottrattore} che decrementava oppure incrementava l'output del multiplexer e faceva un controllo:\\
+				E infine per il \textbf{FLOOR(LOG2)} dato che i risultato potevano variare solo in un intervallo finito e relativamente piccolo \textbf{[0 8]} abbiamo implementato dei controlli a soglia:\\
+					\begin{lstlisting}
+						process(i_clk, i_rst)
+						    begin
+						        if(i_rst = '1') then
+						            floor_log <= "00000000";
+						        elsif i_clk'event and i_clk = '1' then
+						            if(r10_load = '1') then
+						                if   (delta_value1 < "0000000000000010") then
+						                    floor_log <= "00000000";
+						                elsif(delta_value1 < "0000000000000100") then
+						                    floor_log <= "00000001";
+						                elsif(delta_value1 < "0000000000001000") then
+						                    floor_log <= "00000010";
+						                elsif(delta_value1 < "0000000000010000") then
+						                    floor_log <= "00000011";
+						                elsif(delta_value1 < "0000000000100000") then
+						                    floor_log <= "00000100";
+						                elsif(delta_value1 < "0000000001000000") then
+						                    floor_log <= "00000101";
+						                elsif(delta_value1 < "0000000010000000") then
+						                    floor_log <= "00000110";
+						                elsif(delta_value1 < "0000000100000000") then
+						                    floor_log <= "00000111";
+						                elsif(delta_value1 = "0000000100000000") then
+						                    floor_log <= "00001000";
+						                end if;
+						            end if;
+						        end if;
+						    end process;    
+					\end{lstlisting}
+		\section{Stati della Macchina}
+			Abbiamo progettato una macchina a stati di basso livello, spezzando ogni operazione in uno stato a parte per una maggiore chiarezza:\\
+			
+			\begin{itemize}
+ 				\item \textbf{START}: stato iniziale dove attendiamo un segnale di i\_start = 1;
+				\item \textbf{S1}: leggiamo il valore all'indirizzo di memoria = 0;
+                \item \textbf{S2}: carichiamo il primo valore letto nel registro \textbf{col}, poi carichiamo 0 nel registro \textbf{img\_dim} e in fine leggiamo il valore all'indirizzo di memoria = 1;
+				\item \textbf{S3}: carichiamo il valore letto nello stato precedente nel registro \textbf{row};
+				\item \textbf{S4}: cominciamo a decrementare \textbf{row};
+				\item \textbf{S5}: cominciamo il ciclo di decremento di \textbf{row} e incremento del suo \textbf{col} del suo stesso valore per fare la moltiplicazione;
+				\item \textbf{S6}: il risultato della moltiplicazione viene salvato nel registro \textbf{o\_r5};
+				\item \textbf{S7}: comincia il ciclo per la lettura di ogni singolo pixel dell'immagine;
+				\item \textbf{S8}: si salva il valore appena letto in \textbf{o\_r2} e decremento il contatore della dimensione dell'immagine
+				\item \textbf{S9}: assegnamo il primo pixel ai registri \textbf{max} e \textbf{min};
+				\item \textbf{S10}: incrementiamo l'indirizzo per leggere il valore successivo;
+				\item \textbf{S11}: assegniamo a o\_address l'indirizzo incrementato e leggiamo il valore;
+				\item \textbf{S12}: si salva il nuovo pixel in \textbf{o\_r2};
+				\item \textbf{S13}: attendiamo il caricamento del pixel per una corretta valutazione del max e min;
+				\item \textbf{S14}: stato in cui aggiorniamo \textbf{min} nel caso in cui non avessimo letto tutti i pixel si ritorna allo stato \textbf{S10};
+				\item \textbf{S15}: stato in cui aggiorniamo \textbf{max} nel caso in cui non avessimo letto tutti i pixel si ritorna allo stato \textbf{S10};
+				\item \textbf{S16}: calcoliamo il \textbf{delta\_value};
+				\item \textbf{S17}: calcoliamo il \textbf{delta\_value + 1} e si imposta l'indirizzo corretto di \textbf{scrittura};
+				\item \textbf{S18}: calcoliamo il \textbf{log(delta\_value + 1)} e si imposta l'indirizzo correto di \textbf{lettura};
+				\item \textbf{S19}: calcoliamo lo \textbf{shift\_lvl} e carichiamo \textbf{o\_r5} in \textbf{o\_r15}; 
+				\item \textbf{S20}: cominciamo il ciclo di \textbf{scrittura} e \textbf{lettura};
+				\item \textbf{S21}: assegniamo l'indirizzo di \textbf{lettura} a \textbf{o\_address};
+				\item \textbf{S22}: effettuiamo la richiesta di \textbf{lettura};
+				\item \textbf{S23}: salviamo il valore letto in \textbf{o\_r16};
+				\item \textbf{S24}: calcoliamo il valore del pixel corrente meno il \textbf{min};
+				\item \textbf{S25}:	shiftiamo il valore ottenuto e assegniamo a \textbf{o\_address} l'indirizzo di \textbf{scrittura};
+				\item \textbf{S26}: incrementiamo il contatore del ciclo e carichiamo il valore ottenuto dall'algoritmo in \textbf{o\_data} per la \textbf{scrittura};
+				\item \textbf{S27}: effetuiamo la scrittura in memoria;
+				\item \textbf{S28}: attendiamo l'incremento del contatore per una corretta valutazione del segnal di fine \textbf{scrittura};
+				\item \textbf{FINISH}: settiamo \textbf{o\_done} = 1 e ritorniamo allo stato \textbf{START}.
+			\end{itemize}
+			\begin{center}
+				\includegraphics[width=400px, height=168px]{macchina}
+			\end{center}
+	\chapter{Testing}
+		\section{Test Base}
+			Abbiamo usato i test base forniti dalla consegna come primo step per verificare il corretto funzionamento del progetto.\\
+			Sotto è riportato il risultato del \textbf{Behavioural} con input presi di una immagine \textbf{4x3}:\\
+			\includegraphics[width=530px, height=300px]{TestBase}\\\\
+			\textbf{valori utilizzati:}\\
+			\begin{center}
+			\begin{tabular}{|c | c|}
+					 \hline Ind. Mem. & Valore \\ \hline 
+								0 & 4\\ \hline
+								1 & 3\\ \hline
+								2 & 0\\ \hline
+								3 & 0\\ \hline
+								4 &	0 \\ \hline
+								5 & 0\\ \hline
+								6 & 128\\ \hline
+								7 &  128\\ \hline
+								8 &  128 \\ \hline
+								9 &  128\\ \hline
+								10 & 255\\ \hline
+								11 & 255\\ \hline
+								12 & 255 \\ \hline
+								13 & 255\\ \hline
+								14 & 0\\ \hline
+								15 & 0\\ \hline
+								16 & 0 \\ \hline
+								17 & 0\\ \hline
+								18 & 128\\ \hline
+								19 & 128\\ \hline
+								20 &	128 \\ \hline
+								21 & 128\\ \hline
+								22 & 255\\ \hline
+								23 &	255 \\ \hline
+								24 & 255\\ \hline
+								25 & 255\\ \hline
+				\end{tabular}
+				\end{center}
+		\section{Test casi limite}
+			Abbiamo identificato due pricipali casi limite:\\\par
+			\begin{enumerate}
+ 				\item caso immagine con \textbf{dimensione 0}, ovvero se uno dei valori presenti nei primi due indirizzi di memoria, che corrispondo alla dimensione, fosse 0;
+					  
+ 				\item caso immagine con \textbf{dimensione 1}, ovvero i valori presenti nei primi due indirizzi di memoria, che corrispondono alla sua dimensione, fossero entrambi 1.
+			\end{enumerate}
+			\subsection{Immagine dimensione 0xDC}
+				In questo caso, dato che nel nostro \textbf{design} della macchina a stati abbiamo gestito tale caso nello stato \textbf{S7} dove il risultato della motiplicazione risulta \textbf{0} e porta la macchina
+				direttamente allo stato \textbf{FINISH} con \textbf{o\_we} sempre basso, il test risulta corretto.\\
+				Sotto è riportato il risultato del \textbf{Behavioural} con input presi di una immagine \textbf{2x0}:\\\\
+				\includegraphics[width=530px, height=300px]{img2x0}
+					\textbf{valori utilizzati:}\\
+						\begin{center}
+						\begin{tabular}{|c | c|}
+					 		\hline Ind. Mem. & Valore \\ \hline 
+								0 & 2\\ \hline
+								1 & 0\\ \hline
+						\end{tabular}
+						\end{center}	
+			\subsection{Immagine dimensione 1x1}
+				Trattato come caso limite ma non tanto da dover scalare il design, è dunque possibile processarlo come una qualsiasi immagine di dimensioni maggiori di 0.
+				Sotto è riportato il risultato del \textbf{Behavioural} con input presi di una immagine \textbf{1x1}:\\\\
+					\includegraphics[width=530px, height=300px]{img1x1}
+					\textbf{valori utilizzati:}\\
+						\begin{center}
+						\begin{tabular}{|c | c|}
+					 		\hline Ind. Mem. & Valore \\ \hline 
+								0 & 1\\ \hline
+								1 & 1\\ \hline
+								2 & 31\\ \hline
+								3 & 0\\ \hline
+						\end{tabular}
+						\end{center}
+		\section{Test autogenerati da script python}
+			Abbiamo in fine usuffruito di un generatore di casi di test(\href{https://github.com/davidemerli/RL-generator-2020-2021}{git repository}) a singole e multiple immagini con esisito positivo. 
+	\chapter{Conclusione}
+			Il componente non funziona in \textbf{post sinstesi} dato che ci siamo accorti della presenza di \textbf{latch} quando assegniamo un valore direttamente negli
+			stati :
+				durante la descrizione del \textbf{current state} ai registri che manipolano gli idirizzi (3 \textbf{latch} ognuno di 16: uno per il registro \textbf{address}, uno per \textbf{out\_address} e uno per \textbf{o\_address}).\\\\\\
+			Il problema è risolvibile tramite l'assegnameto dei valori tramite \textbf{segnali} che verranno gestiti nel \textbf{datapath}(tramite i \textbf{process}) evitando 
+			l'assegnamento diretto nella descrizione del \textbf{current state}.\\ Abbiamo implementato una bozza della soluzione sopracitata ed effettivamente il numero di \textbf{latch} scompare e il componente si sintetizza
+			correttamente. Tuttavia tale implementazione fa variare il risultato dell'algoritmo e lo porta a dei valori non corretti, abbiamo dunque capito che fosse necessario una riprogettazione abbastanza sostanziosa del
+			componente. Per problemi di tempistica dunque abbiamo optato di lasciare il componente funzionante solo in \textbf{pre sintesi} e riprogettarlo in futuro.
+\end{document}
